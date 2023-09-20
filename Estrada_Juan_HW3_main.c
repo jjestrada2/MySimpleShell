@@ -35,6 +35,59 @@ int main() {
             *pipePos = '\0';
             char* command1 = input;
             char* command2 = pipePos + 1;
+            printf("%s",command1);
+            printf("%s",command2);
+            //Create pipe
+            int pipefd[2];
+            
+            if(pipe(pipefd)==-1){
+                perror("pipe");
+                return 1;
+            }
+            //Fork for the command1
+            pid_t pid1 = fork();
+            if(pid1 == 0){
+                //child process
+                close(pipefd[0]); //Close read end 
+                dup2(pipefd[1],STDOUT_FILENO); // redirect stdout to the write 
+                close(pipefd[1]);//Close the Original write of the pipe
+
+                //Execute command1
+                execlp(command1,command1,(char*)NULL);
+                perror("execlp (command1)");
+                return 1;
+            }else if(pid1 > 0){
+                //Parent of process command1
+                //Fork command2
+                pid_t pid2 = fork();
+                if(pid2 == 0){
+                    //child process from command2
+                    close(pipefd[1]); //close write end 
+                    dup2(pipefd[0],STDIN_FILENO);//redirect stdin to the read od the pipe
+                    close(pipefd[0]);//close the read end of the pipe
+
+                    //Execute command2
+                    execlp(command2,command2, (char*)NULL);
+                    perror("execlp command2");
+                    return 1;
+
+                }else if(pid2 > 0){
+                    //parent process of command2
+                    //close both ends of pipe
+                    close(pipefd[0]);
+                    close(pipefd[1]);
+
+                    //wait for both child processes to comlplete
+                    waitpid(pid1,NULL,0);
+                    waitpid(pid2,NULL,0);
+                }else{
+                    perror("Fork pid2");
+                    return 1;
+                }
+            }else{
+                perror("fork pid1");
+                return 1;
+            }
         }else{
 
         
