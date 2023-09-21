@@ -1,13 +1,21 @@
 /**************************************************************
-* Class:  CSC-415-0# Fall 2023
-* Name:
-* Student ID:
-* GitHub ID:
+* Class:  CSC-415-03 Fall 2023
+* Name: Juan Estrada
+* Student ID: 923058731
+* GitHub ID: jjestrada2
 * Project: Assignment 3 – Simple Shell
 *
-* File: <name of this file>
+* File: Estrada_Juan_HW3_main.c
 *
-* Description:
+* Description: a simple shell program. It enables users to enter
+* and execute various shell commands in a command-line interface.
+* This basic shell supports features such as piping multiple com-
+* mands together (e.g., "command1 | command2"), wildcard expansion 
+* (e.g., "ls *.c" to list all '.c' files), and executing single co-
+* mmands. The code employs functions to tokenize user input, manage
+* child processes for command execution, and handle wildcard pattern 
+* matching. It also includes error handling and provides feedback on 
+* the execution status of child processes. 
 *
 **************************************************************/
 #include <stdio.h>
