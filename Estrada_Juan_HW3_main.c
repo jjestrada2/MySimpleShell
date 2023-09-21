@@ -15,6 +15,130 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <glob.h>
+
+
+// Function to perform wildcard expansion
+char **expand_wildcards(const char *pattern) {
+    glob_t globbuf;
+    glob(pattern, 0, NULL, &globbuf);
+
+    if (globbuf.gl_pathc == 0) {
+        globfree(&globbuf);
+        return NULL;
+    }
+
+    char **result = (char **)malloc((globbuf.gl_pathc + 1) * sizeof(char *));
+    for (size_t i = 0; i < globbuf.gl_pathc; i++) {
+        result[i] = strdup(globbuf.gl_pathv[i]);
+    }
+
+    result[globbuf.gl_pathc] = NULL;
+    globfree(&globbuf);
+
+    return result;
+}
+
+char **splitline(char *line) {
+    char **tokens = (char **)malloc(188 * sizeof(char *));
+    if (tokens == NULL) {
+        perror("malloc");
+        exit(1);
+    }
+
+    char *token = strtok(line, " ");
+    int i = 0;
+    while (token != NULL) {
+        tokens[i++] = strdup(token);
+        token = strtok(NULL, " ");
+    }
+
+    tokens[i] = NULL; // NULL-terminate the array
+    return tokens;
+}
+
+
+int my_pipe(char *line) {
+    int i, commandc = 0, numpipes = 0;
+    pid_t pid;
+    char **args;
+    
+  //count the number of pipes in the line
+    for (i = 1; line[i] != '\0'; i++) {
+            if (line[i] == '|' && line[i + 1] != '|' && line[i - 1] != '|') {
+                numpipes++;
+            }
+        
+    }
+    //Allocate memory for my ALL my pipes  
+    int *pipefds = (int *)malloc((2 * numpipes) * sizeof(int));
+    char *token = (char *)malloc((128) * sizeof(char));
+
+
+    token = strtok_r(line, "|", &line);
+    //Create pipes looping through out the arrey pipefds
+    for (i = 0; i < numpipes; i++) {
+        int createPipe = pipe(pipefds + i *2);// "is *2 because need a pipe requires two file descriptors"
+        if (createPipe < 0) {
+            perror("pipe creation failed");
+            return 3;
+        }
+    }
+
+    do {
+        pid = fork();
+        if (pid == 0) { // child process
+
+            //redirection that allows the child process to read from the previous command's output.
+            if (commandc != 0) {
+                //Duplicates the read end of the previous pipe to the standard input (file descriptor 0)
+                int dupReadPrevPipe = dup2(pipefds[(commandc - 1) * 2], 0);
+                if (dupReadPrevPipe < 0) {
+                    perror("Dup Read redirection fail");
+                    exit(1);
+                }
+            }
+            //redirection that allows the child process to send its output to the next command in the pipeline
+            if (commandc != numpipes) {//If is not the last command in the pipeline
+                //Duplicates the write end of the current pipe to the standard output (file descriptor 1) 
+                int dupWriteCurrPipe = dup2(pipefds[commandc * 2 + 1], 1);
+                if (dupWriteCurrPipe  < 0) {
+                    perror("Dup Write redirection fail");
+                    exit(1);
+                }
+            }
+            //Close all files descriptors to prevent resource leaks
+            for (i = 0; i < 2 * numpipes; i++) {
+                close(pipefds[i]);
+            }
+
+          
+            args = splitline(token);
+            execvp(args[0], args);
+            perror("exec failed");
+            exit(1);
+        }else if(pid > 0){//parent process
+            commandc++;
+            int status;
+            printf("Child %d, exited with status: %d\n", pid, WEXITSTATUS(status));
+
+        } else{
+            perror("fork() failed");
+            return 3;
+            // fork error
+        } 
+           
+        
+    } while (commandc < numpipes + 1 && (token = strtok_r(NULL, "|", &line)));
+    for (i = 0; i < 2 * numpipes; i++) {
+        close(pipefds[i]);
+    }
+    
+    free(pipefds);
+    
+    
+}
 
 int main() {
     char input[188];
@@ -24,77 +148,58 @@ int main() {
             printf("Goodbye!\n");
             break;
         }
-        // Remove /n from the inout  buffer
+        // Remove /n from the input buffer
         input[strcspn(input, "\n")] = '\0';
 
-        //Chech for pipe characters
-        char* pipePos = strchr(input,'|');
+        // Check for pipe characters
+        char *pipePos = strchr(input, '|');
 
-        if(pipePos){
-            //Split input into two part adding NULL
-            *pipePos = '\0';
-            char* command1 = input;
-            char* command2 = pipePos + 1;
-            printf("%s",command1);
-            printf("%s",command2);
-            //Create pipe
-            int pipefd[2];
-            
-            if(pipe(pipefd)==-1){
-                perror("pipe");
-                return 1;
+        if (pipePos) {
+            // Call my_pipe function to handle pipes and command execution
+            int result = my_pipe(input);
+
+            if (result == -1) {
+                // Handle error (e.g., invalid command)
+                printf("Invalid command\n");
             }
-            //Fork for the command1
-            pid_t pid1 = fork();
-            if(pid1 == 0){
-                //child process
-                close(pipefd[0]); //Close read end 
-                dup2(pipefd[1],STDOUT_FILENO); // redirect stdout to the write 
-                close(pipefd[1]);//Close the Original write of the pipe
 
-                //Execute command1
-                execlp(command1,command1,(char*)NULL);
-                perror("execlp (command1)");
-                return 1;
-            }else if(pid1 > 0){
-                //Parent of process command1
-                //Fork command2
-                pid_t pid2 = fork();
-                if(pid2 == 0){
-                    //child process from command2
-                    close(pipefd[1]); //close write end 
-                    dup2(pipefd[0],STDIN_FILENO);//redirect stdin to the read od the pipe
-                    close(pipefd[0]);//close the read end of the pipe
+        } else if (strchr(input, '*') || strchr(input, '?')) {
+            char **matches = expand_wildcards(input);
 
-                    //Execute command2
-                    execlp(command2,command2, (char*)NULL);
-                    perror("execlp command2");
-                    return 1;
+            if (matches) {
+                // Execute a command for each matching file
+                for (int i = 0; matches[i] != NULL; i++) {
+                    pid_t pid = fork();
 
-                }else if(pid2 > 0){
-                    //parent process of command2
-                    //close both ends of pipe
-                    close(pipefd[0]);
-                    close(pipefd[1]);
-
-                    //wait for both child processes to comlplete
-                    waitpid(pid1,NULL,0);
-                    waitpid(pid2,NULL,0);
-                }else{
-                    perror("Fork pid2");
-                    return 1;
+                    if (pid == 0) {
+                        // Child process
+                        char *command[] = {"echo", "Executing:", matches[i], NULL};
+                        execvp(command[0], command);
+                        perror("execvp");
+                        _exit(1);
+                    } else if (pid > 0) {
+                        // Parent process
+                        int status;
+                        waitpid(pid, &status, 0);
+                    } else {
+                        perror("fork");
+                        exit(1);
+                    }
                 }
-            }else{
-                perror("fork pid1");
-                return 1;
+
+                // Free the matches array
+                for (int i = 0; matches[i] != NULL; i++) {
+                    free(matches[i]);
+                }
+                free(matches);
+            } else {
+                printf("No matches found for pattern: %s\n", input);
             }
-        }else{
-
-        
-
+            
+        } else {
             // Tokenize the input
-            char* token = strtok(input, " ");
-            char* args[188]; 
+            char *token = strtok(input, " ");
+            char *args[188];
             int argCount = 0;
 
             while (token != NULL) {
@@ -103,7 +208,7 @@ int main() {
             }
 
             args[argCount] = NULL; // NULL-terminate the arguments array
-        
+
             // Fork a new process
             pid_t pid = fork();
 
