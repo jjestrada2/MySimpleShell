@@ -7,7 +7,7 @@
 *
 * File: Estrada_Juan_HW3_main.c
 *
-* Description: a simple shell program. It enables users to enter
+* Description:  Simple shell program. It enables users to enter
 * and execute various shell commands in a command-line interface.
 * This basic shell supports features such as piping multiple com-
 * mands together (e.g., "command1 | command2"), wildcard expansion 
@@ -25,19 +25,58 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <glob.h>
+#include <ctype.h>
+
+void execute_command(char *command) {
+    // Tokenize the input
+    char *token = strtok(command, " ");
+    char *args[188];
+    int argCount = 0;
+
+    while (token != NULL) {
+        args[argCount++] = token;
+        token = strtok(NULL, " ");
+    }
+
+    args[argCount] = NULL; // NULL-terminate the arguments array
+
+    // Fork a new process
+    pid_t pid = fork();
+
+    if (pid == 0) {
+        // Child process
+        execvp(args[0], args);
+        // Handle execvp failure
+        perror("execvp");
+        _exit(1);
+    } else if (pid > 0) {
+        // Parent process
+        int status;
+        waitpid(pid, &status, 0);
+        printf("Child %d, exited with status: %d\n", pid, WEXITSTATUS(status));
+    } else {
+        // Handle fork failure
+        perror("fork");
+    }
+}
 
 
 // Function to perform wildcard expansion
 char **expand_wildcards(const char *pattern) {
     glob_t globbuf;
+    //perform wildcard expansion
     glob(pattern, 0, NULL, &globbuf);
 
+    //it check if there is no matches 
     if (globbuf.gl_pathc == 0) {
         globfree(&globbuf);
         return NULL;
     }
 
+    //Allocates memory for an array of strings (result) to store the matched file paths.
     char **result = (char **)malloc((globbuf.gl_pathc + 1) * sizeof(char *));
+
+    //iterates through the list of matched file paths stored in globbuf.gl_pathv
     for (size_t i = 0; i < globbuf.gl_pathc; i++) {
         result[i] = strdup(globbuf.gl_pathv[i]);
     }
@@ -158,11 +197,29 @@ int main() {
         }
         // Remove /n from the input buffer
         input[strcspn(input, "\n")] = '\0';
+        
+        if (strcmp(input, "exit") == 0) {
+            printf("Goodbye!\n");
+            break; // Exit the loop when the user enters "exit"
+        }
+
+       //Check if input is empty ()
+       int isEmpty = 1;
+        for(int i = 0; input[i]; i++){
+            if(!isspace((unsigned char)input[i])){
+                isEmpty = 0;
+                break;
+            }
+        }
+        if(isEmpty){
+            printf("Error: No commnads ...Try again\n");
+            continue;
+        }
+        
 
         // Check for pipe characters
-        char *pipePos = strchr(input, '|');
-
-        if (pipePos) {
+        
+        else if (strchr(input, '|')) {
             // Call my_pipe function to handle pipes and command execution
             int result = my_pipe(input);
 
@@ -171,9 +228,12 @@ int main() {
                 printf("Invalid command\n");
             }
 
-        } else if (strchr(input, '*') || strchr(input, '?')) {
-            char **matches = expand_wildcards(input);
+        } else if (strchr(input, '*') ) {
+            
+            char *command1 = strtok(input, " ");
+            char *pattern = strtok(NULL, " ");
 
+            char **matches = expand_wildcards(pattern);
             if (matches) {
                 // Execute a command for each matching file
                 for (int i = 0; matches[i] != NULL; i++) {
@@ -181,7 +241,7 @@ int main() {
 
                     if (pid == 0) {
                         // Child process
-                        char *command[] = {"echo", "Executing:", matches[i], NULL};
+                        char *command[] = {command1, matches[i], NULL};
                         execvp(command[0], command);
                         perror("execvp");
                         _exit(1);
@@ -205,36 +265,7 @@ int main() {
             }
             
         } else {
-            // Tokenize the input
-            char *token = strtok(input, " ");
-            char *args[188];
-            int argCount = 0;
-
-            while (token != NULL) {
-                args[argCount++] = token;
-                token = strtok(NULL, " ");
-            }
-
-            args[argCount] = NULL; // NULL-terminate the arguments array
-
-            // Fork a new process
-            pid_t pid = fork();
-
-            if (pid == 0) {
-                // Child process
-                execvp(args[0], args);
-                // Handle execvp failure
-                perror("execvp");
-                _exit(1);
-            } else if (pid > 0) {
-                // Parent process
-                int status;
-                waitpid(pid, &status, 0);
-                printf("Child %d, exited with status: %d\n", pid, WEXITSTATUS(status));
-            } else {
-                // Handle fork failure
-                perror("fork");
-            }
+             execute_command(input);
         }
     }
     return 0;
