@@ -1,49 +1,100 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-24ddc0f5d75046c5622901739e7c5dd533143b0c8e959d652212380cedb1ea36.svg)](https://classroom.github.com/a/j0JS6lN3)
-**Assignment 3 - Simple Shell**
+# Custom C Shell 🐚🐧
 
-Welcome to your third homework assignment.  
+## Description🤗
 
-Let me remind you of the expectations.  Code should be neat, well documented.  Variables should have meaningful names and be in a consistent format (I do not care if you use camelCase or under_scores in variables but be consistent.  In addition, each file should have a standard header as defined below.  (Keep comments to around 80 characters per line, and not line grater than 100 characters).
+This project is a custom shell implemented in C. The shell reads user input, parses and executes commands by forking new processes, and supports basic piping between commands. It utilizes the `fork()` and `execvp()` system calls to create and manage child processes.
 
-```
-/**************************************************************
-* Class:  CSC-415-0# Fall 2023
-* Name:
-* Student ID:
-* GitHub ID:
-* Project: Assignment 3 – Simple Shell
-*
-* File: <name of this file>
-*
-* Description:
-*
-**************************************************************/
-```
-This is an INDIVIDUAL assignment.  You can (and should) work in groups to research how to do the assignment, but each person should code their own version and make their own submission.
+## Features🙌
 
-In our slides we talked about a simple shell.  For this assignment you will implement your own shell that runs on top of the regular command-line interpreter for Linux.  
+- **Command Execution:**
+  - Reads and executes commands specified by the user.
+  - Supports absolute paths (e.g., `/bin/ls`) and path expansion using the `PATH` environment variable.
+  - Executes commands with up to four command-line arguments.
 
-Your shell should read lines of user input, then parse and execute the commands by forking/creating new processes.  For each command, your shell should call fork() followed by execvp().  Following each command, your shell should wait for its child process to complete, and then print the child PID and the **return result from the child process**.  The user should be able to specify the command to execute by giving a path to the executable file (e.g. `/bin/ls`) or by using path expansion to locate the executable file (i.e. searching each directory in the PATH environment variable).  (Note that the execvp() function perform this processing automatically; you do not need to program it yourself.)  
+- **Process Management:**
+  - Forks a new process for each command.
+  - Waits for child processes to complete and prints their PID and return status.
 
-If your shell encounters an error while reading a line of input it should report the error and exit.  If your shell encounters EOF while reading a line of input, it should exit gracefully without reporting an error.
-Ensure that you do not overflow a 187 byte buffer when fetching the line of input (functions that do not accept the size of your buffer are not able to prevent overflows whereas functions that do accept a size generally do; be sure to check the manpage of any function you use carefully).  You do not need to report an error if the user's input line is larger than the 187 byte buffer; just use the truncated input as the command.
+- **Error Handling:**
+  - Reports errors on encountering input errors.
+  - Gracefully exits on EOF without reporting errors.
+  - Handles input up to a 187-byte buffer size without overflow.
 
-You can test the EOF by running `make run < commands.txt` or from the prompt enter `CTRL-D`
+- **Piping:**
+  - Supports piping of commands, allowing the output of one command to be used as input for the next.
+  - No limit on the number of piped commands, constrained only by command line length.
 
-Before your shell forks a new process to call `execvp()`, it should parse the input string and separate it into a collection of substrings representing the executable file and any command-line arguments.  If the user entered an empty line, report an error and fetch a new line of input.  Your code must handle at least four command-line arguments (in addition to the name of the executable file itself) for each command.  
+## Getting Started🐢
+
+### Prerequisites
+
+- **GCC (GNU Compiler Collection):** Ensure you have GCC installed on your system. You can install it via package managers like `apt`, `yum`, or `brew`.
+
+### Installation🎮
+
+1. **Clone the Repository:**
+
+    ```bash
+    git clone https://github.com/jjestrada2/custom-c-shell.git
+    cd custom-c-shell
+    ```
+
+2. **Compile the Project:**
+
+    ```bash
+    make
+    ```
+
+### Usage🏋️
+
+1. **Running the Shell:**
+
+    ```bash
+    ./shell
+    ```
+
+2. **Executing Commands:**
+
+    - Enter commands directly into the shell prompt. Example:
+
+      ```bash
+      /bin/ls
+      ```
+
+    - Enter commands with arguments. Example:
+
+      ```bash
+      /bin/echo Hello, World!
+      ```
+
+    - Use pipes to chain commands. Example:
+
+      ```bash
+      cat myfile.txt | wc -l
+      ```
+
+3. **Exiting the Shell:**
+
+    - Type `exit` to terminate the shell.
+
+4. **Handling EOF:**
+
+    - Test EOF handling by running:
+
+      ```bash
+      make run < commands.txt
+      ```
+
+    - Or enter `CTRL-D` at the shell prompt.
 
 
-You should store pointers to the substrings in an array (similar to the “argv” array passed to main()) and pass this array of arguments to execvp().  Note that the number of command-line arguments is variable; this is indicated in the array by including a NULL pointer in the array after the last substring.  (This means that if the user specifies N substrings, your array must hold N + 1 pointers where the last pointer is NULL.)  If the user enters the **exit** command, your shell should terminate (returning to the regular shell).
+### Implementation Details🦸‍♂️
 
-Note: your shell does not need to support `cd` (change directory).
+- **Buffer Size:** The input buffer size is limited to 187 bytes to prevent overflow.
+- **Command Parsing:** Input strings are parsed into an array of substrings representing the executable and its arguments. This array is passed to `execvp()`.
+- **Piping:** The shell supports piping commands using the `|` character, enabling stdout of one command to be redirected as stdin to the next command.
 
-Piping - You shell must also support piping.  An example of using pipes in the Linux shell would be `cat myfile.txt | wc -l` which would copy the file myfile.txt to standard output which is redirected as the standard input to wc (wordcount) which will then display how many lines were in the file myfile.txt.  The pipe character `|` seperates different commands and the output (stdout) of the program on the left becomes the input (stdin) for the program on the right.  There is no limit to the number of commands that can be piped together.  (Just limited by the command line length specified above).  
-
-Hint: get your shell working without pipes first, then go back and add pipes.  While this may require a little more work to change your code to support pipes, it ensures you do the rest of the shell correctly so you are not trying to debug multiple things at once.  Some functions you will need include `pipe` and `dup2`.
-
-Your program must also accept a command line argument which is the prefix prompt.  If no value is specified use “> ” as the prompt.
-
-Here is a sample execution:
+### Sample execution:🙌
 
 ```
  student@student-VirtualBox:~/CSC415/assignment3$ ./assn3 prompt$
@@ -59,19 +110,19 @@ prompt$ exit
 student@student-VirtualBox:~/CSC415/assignment3$
 ```
 
-You should submit your source code file(s), and Makefile along with a writeup in PDF format (using the template) that includes a description of what you did issues you had and resolutions and the compilation and execution output (screen shots) from your program to GitHub and just the PDF also to Canvas. Your execution output should include commands with command-line arguments.  Then use the exit command to exit your program and show the output of the same commands in the regular command-line interpreter for that machine to ensure they match.
+## Contributing🙇‍♂️
 
-All filenames should be `<lastname>_<firstname>HW<#>_<optional>.<proper extension>`
+If you would like to contribute to this project, please fork the repository and create a pull request with your changes. Contributions are always welcome!
 
-Rubric
+## License📜
 
-| Grade Item	| Grade Points |
-|:-----------|----------------------------------------:|
-| Standard Header	| 2 |
-| Command Processing |             	35
-| Handeling of Pipes | 15
-| Custom Prompt	| 3 |
-| Output Status	| 10 |
-| Code Comments	| 5 |
-| Writeup	| 10 (Description, Compilation, Sample Output)| 
+This project is licensed under the MIT License - see the [LICENSE](https://choosealicense.com/licenses/mit/) file for details.
+
+## Credits🔥
+
+- [Juan Estrada](https://github.com/jjestrada2) - Developer of this project.
+
+## Contact🦻
+
+For support or inquiries, please contact [Juan Estrada](mailto:juan5801331@gmail.com).
 
